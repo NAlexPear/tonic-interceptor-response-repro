@@ -6,7 +6,16 @@ use std::time::Duration;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::{Request, Response, Status};
 
-pub struct Health;
+/// Dummy Health service that can be configured to fail
+pub struct Health {
+    should_fail: bool,
+}
+
+impl Health {
+    pub fn new(should_fail: bool) -> Self {
+        Self { should_fail }
+    }
+}
 
 #[tonic::async_trait]
 impl GrpcService for Health {
@@ -14,9 +23,13 @@ impl GrpcService for Health {
         &self,
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
-        Ok(Response::new(HealthCheckResponse {
-            status: ServingStatus::Serving.into(),
-        }))
+        if self.should_fail {
+            Err(Status::internal("Failure within the Check method"))
+        } else {
+            Ok(Response::new(HealthCheckResponse {
+                status: ServingStatus::Serving.into(),
+            }))
+        }
     }
 
     type WatchStream = UnboundedReceiverStream<Result<HealthCheckResponse, Status>>;
@@ -25,21 +38,25 @@ impl GrpcService for Health {
         &self,
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<Self::WatchStream>, Status> {
-        let (transmitter, receiver) = tokio::sync::mpsc::unbounded_channel();
+        if self.should_fail {
+            Err(Status::internal("Failure within the Watch method"))
+        } else {
+            let (transmitter, receiver) = tokio::sync::mpsc::unbounded_channel();
 
-        #[allow(unreachable_code)]
-        tokio::spawn(async move {
-            loop {
-                transmitter.send(Ok(HealthCheckResponse {
-                    status: ServingStatus::Serving.into(),
-                }))?;
+            #[allow(unreachable_code)]
+            tokio::spawn(async move {
+                loop {
+                    transmitter.send(Ok(HealthCheckResponse {
+                        status: ServingStatus::Serving.into(),
+                    }))?;
 
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
 
-            Ok::<_, tokio::sync::mpsc::error::SendError<_>>(())
-        });
+                Ok::<_, tokio::sync::mpsc::error::SendError<_>>(())
+            });
 
-        Ok(Response::new(UnboundedReceiverStream::new(receiver)))
+            Ok(Response::new(UnboundedReceiverStream::new(receiver)))
+        }
     }
 }
