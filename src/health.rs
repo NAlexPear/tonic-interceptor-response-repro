@@ -7,6 +7,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::{Request, Response, Status};
 
 /// Dummy Health service that can be configured to fail
+#[derive(Debug)]
 pub struct Health {
     should_fail: bool,
 }
@@ -19,11 +20,15 @@ impl Health {
 
 #[tonic::async_trait]
 impl GrpcService for Health {
+    #[tracing::instrument]
     async fn check(
         &self,
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
+        tracing::info!("Initiating single health check");
+
         if self.should_fail {
+            tracing::warn!("Cancelling health check");
             Err(Status::internal("Failure within the Check method"))
         } else {
             Ok(Response::new(HealthCheckResponse {
@@ -34,11 +39,15 @@ impl GrpcService for Health {
 
     type WatchStream = UnboundedReceiverStream<Result<HealthCheckResponse, Status>>;
 
+    #[tracing::instrument]
     async fn watch(
         &self,
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<Self::WatchStream>, Status> {
+        tracing::info!("Initiating stream of health checks");
+
         if self.should_fail {
+            tracing::warn!("Cancelling health check stream");
             Err(Status::internal("Failure within the Watch method"))
         } else {
             let (transmitter, receiver) = tokio::sync::mpsc::unbounded_channel();

@@ -25,6 +25,10 @@ enum Error {
 
 /// Convenience wrapper around the tonic service
 async fn run_service() -> Result<(), Error> {
+    // set up logging
+    tracing_subscriber::fmt::init();
+
+    // set up service configurations
     let address = "0.0.0.0:50051".parse().map_err(|_| Error::Address)?;
 
     let failure_mode = std::env::var("FAILURE_MODE")
@@ -33,9 +37,11 @@ async fn run_service() -> Result<(), Error> {
         .transpose()?
         .unwrap_or_default();
 
-    println!(
-        "gRPC service starting with failure mode {:?}",
-        &failure_mode
+    // start the service itself
+    tracing::info!(
+        failure_mode = ?&failure_mode,
+        address = %&address,
+        "gRPC service starting ",
     );
 
     Server::builder()
@@ -46,7 +52,7 @@ async fn run_service() -> Result<(), Error> {
         .serve(address)
         .await?;
 
-    println!("gRPC service stopped");
+    tracing::info!("gRPC service stopped");
 
     Ok(())
 }
@@ -54,6 +60,6 @@ async fn run_service() -> Result<(), Error> {
 #[tokio::main]
 async fn main() {
     if let Err(error) = run_service().await {
-        eprintln!("Stopping gRPC service with error: {}", error);
+        tracing::error!(error = %error, "Stopping gRPC service with error");
     }
 }
