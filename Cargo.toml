@@ -1,0 +1,24 @@
+[package]
+name = "tonic-interceptor-response-repro"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tonic-build = "0.6.0"
+
+[dependencies]
+futures = "0.3.17"
+prost = "0.9.0"
+prost-types = "0.9.0"
+thiserror = "1.0.30"
+tokio-stream = "0.1.8"
+
+[dependencies.tokio]
+default-features = false
+features = ["macros", "sync", "time", "rt-multi-thread"]
+version = "1.6.1"
+
+[dependencies.tonic]
+default-features = false
+features = ["codegen", "prost", "transport"]
+version = "0.6.1"
